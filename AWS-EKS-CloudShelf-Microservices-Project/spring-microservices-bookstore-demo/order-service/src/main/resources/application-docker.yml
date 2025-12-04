@@ -1,0 +1,31 @@
+server:
+  port: 8082
+
+spring:
+  application:
+    name: order-service
+  datasource:
+    url: jdbc:postgresql://postgres-order:5432/order_service
+    username: ${SPRING_DATASOURCE_USERNAME:admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:password}
+  kafka:
+    bootstrap-servers: broker:9092
+
+# Stock Check Service URL for Docker
+stock:
+  check:
+    service:
+      url: http://stock-check-service:8083
+
+# Resilience4j TimeLimiter
+resilience4j:
+  timelimiter:
+    instances:
+      stock-check:
+        timeout-duration: 10s
+        cancel-running-future: true
+
+management:
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans

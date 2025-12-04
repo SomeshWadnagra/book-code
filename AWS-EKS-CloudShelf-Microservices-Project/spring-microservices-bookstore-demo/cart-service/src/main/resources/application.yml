@@ -1,0 +1,41 @@
+server:
+  port: 8087
+
+spring:
+  application:
+    name: cart-service
+
+  data:
+    redis:
+      host: redis.cloudshelf.svc.cluster.local
+      port: 6379
+
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 5000
+        readTimeout: 5000
+      stock-check-service:
+        url: http://stock-check-service.cloudshelf.svc.cluster.local:8083
+      order-service:
+        url: http://order-service.cloudshelf.svc.cluster.local:8082  
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,circuitbreakers
+  endpoint:
+    health:
+      show-details: always
+  health:
+    circuitbreakers:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+logging:
+  level:
+    org.springframework.cloud.openfeign: DEBUG

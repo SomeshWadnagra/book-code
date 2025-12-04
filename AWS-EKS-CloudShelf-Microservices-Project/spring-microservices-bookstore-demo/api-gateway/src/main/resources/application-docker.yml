@@ -1,0 +1,48 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  
+  cloud:
+    gateway:
+      routes:
+        - id: book-service
+          uri: ${BOOK_SERVICE_URL:http://book-service:8081}
+          predicates:
+            - Path=/api/graphql, /graphiql/**
+        
+        - id: author-service
+          uri: ${AUTHOR_SERVICE_URL:http://author-service:8085}
+          predicates:
+            - Path=/api/authors/**
+        
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL:http://order-service:8082}
+          predicates:
+            - Path=/api/order/**
+
+        - id: reviews-service
+          uri: ${REVIEWS_SERVICE_URL:http://reviews-service:8086}
+          predicates:
+            - Path=/api/reviews/**
+          filters:
+            - RewritePath=/api/reviews/(?<segment>.*), /reviews/${segment}
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: 
+              - "${CORS_ALLOWED_ORIGINS:http://localhost:3000}"
+            allowedMethods: "*"
+            allowedHeaders: "*"
+            allowCredentials: true
+
+management:
+  zipkin:
+    tracing:
+      endpoint: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://zipkin:9411/api/v2/spans}
+  
+  tracing:
+    sampling:
+      probability: 1.0

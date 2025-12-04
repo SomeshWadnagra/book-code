@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongodb-exporter
+  namespace: cloudshelf
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb-exporter
+  template:
+    metadata:
+      labels:
+        app: mongodb-exporter
+    spec:
+      containers:
+        - name: mongodb-exporter
+          image: 443071119316.dkr.ecr.us-east-1.amazonaws.com/cloudshelf/mongodb-exporter:0.40.0
+          args:
+            - "--mongodb.uri=mongodb://admin:cloudshelf2025@mongodb.cloudshelf.svc.cluster.local:27017/admin"
+            - "--collect-all"
+          ports:
+            - containerPort: 9216
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-exporter
+  namespace: cloudshelf
+spec:
+  ports:
+    - port: 9216
+      targetPort: 9216
+  selector:
+    app: mongodb-exporter

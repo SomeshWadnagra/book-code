@@ -1,0 +1,89 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: api-gateway
+  
+  # Cloud Gateway routes configuration
+  cloud:
+    gateway:
+      routes:
+        # Book Service routes
+        - id: book-service
+          uri: ${BOOK_SERVICE_URL:http://localhost:8081}
+          predicates:
+            - Path=/api/graphql, /graphiql/**
+          filters:
+            - StripPrefix=0
+        
+        # Author Service routes
+        - id: author-service
+          uri: ${AUTHOR_SERVICE_URL:http://localhost:8085}
+          predicates:
+            - Path=/api/authors/**
+          filters:
+            - RewritePath=/api/authors/(?<segment>.*), /api/authors/${segment}
+        
+        # Order Service routes
+        - id: order-service
+          uri: ${ORDER_SERVICE_URL:http://localhost:8082}
+          predicates:
+            - Path=/api/order/**
+          filters:
+            - RewritePath=/api/order/(?<segment>.*), /api/order/${segment}
+
+        # Reviews Service routes
+        - id: reviews-service
+          uri: ${REVIEWS_SERVICE_URL:http://localhost:8086}
+          predicates:
+            - Path=/api/reviews/**
+          filters:
+            - RewritePath=/api/reviews/(?<segment>.*), /${segment}
+        
+      # Global CORS configuration
+      globalcors:
+        corsConfigurations:
+          '[/**]':
+            allowedOrigins: 
+              - "${CORS_ALLOWED_ORIGINS:http://localhost:3000}"
+            allowedMethods:
+              - GET
+              - POST
+              - PUT
+              - DELETE
+              - OPTIONS
+            allowedHeaders: "*"
+            allowCredentials: true
+
+# Management and Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  
+  # Zipkin tracing
+  zipkin:
+    tracing:
+      endpoint: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://localhost:9411/api/v2/spans}
+  
+  tracing:
+    sampling:
+      probability: 1.0
+  
+  # Prometheus metrics
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Logging
+logging:
+  level:
+    root: INFO
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.web: DEBUG

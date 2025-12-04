@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: author-service-config
+  namespace: cloudshelf
+data:
+  SERVER_PORT: "8085"
+  SPRING_APPLICATION_NAME: "author-service"
+  SPRING_R2DBC_URL: "r2dbc:postgresql://postgres-author.cloudshelf.svc.cluster.local:5432/author_service"
+  SPRING_FLYWAY_URL: "jdbc:postgresql://postgres-author.cloudshelf.svc.cluster.local:5432/author_service"
+  MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: "http://zipkin.cloudshelf.svc.cluster.local:9411/api/v2/spans"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"

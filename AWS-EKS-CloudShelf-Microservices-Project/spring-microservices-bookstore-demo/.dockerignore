@@ -1,0 +1,13 @@
+.git
+**/target
+**/.m2
+**/.idea
+**/.vscode
+**/.DS_Store
+**/node_modules
+**/build
+**/dist
+**/coverage
+**/__pycache__
+**/.venv
+**/.env

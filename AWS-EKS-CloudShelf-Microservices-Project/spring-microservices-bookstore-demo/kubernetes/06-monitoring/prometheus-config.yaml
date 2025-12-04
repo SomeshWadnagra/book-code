@@ -1,0 +1,104 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: cloudshelf
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      # Prometheus self-monitoring
+      - job_name: 'prometheus'
+        metrics_path: /prometheus/metrics
+        static_configs:
+          - targets: ['localhost:9090']
+
+      # API Gateway
+      - job_name: 'api-gateway'
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['api-gateway.cloudshelf.svc.cluster.local:8080']
+
+      # Book Service
+      - job_name: 'book-service'
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['book-service.cloudshelf.svc.cluster.local:8081']
+
+      # Author Service
+      - job_name: 'author-service'
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['author-service.cloudshelf.svc.cluster.local:8085']
+
+      # Order Service
+      - job_name: 'order-service'
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['order-service.cloudshelf.svc.cluster.local:8082']
+
+      # Stock Check Service
+      - job_name: 'stock-check-service'
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['stock-check-service.cloudshelf.svc.cluster.local:8083']
+
+      # Message Service
+      - job_name: 'message-service'
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['message-service.cloudshelf.svc.cluster.local:8080']
+
+      # Reviews Service
+      - job_name: 'reviews-service'
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['reviews-service.cloudshelf.svc.cluster.local:8086']
+  
+      # Cart Service
+      - job_name: 'cart-service'
+        metrics_path: /actuator/prometheus
+        static_configs:
+          - targets: ['cart-service.cloudshelf.svc.cluster.local:8087']
+
+      # MongoDB Exporter
+      - job_name: 'mongodb'
+        static_configs:
+          - targets: ['mongodb-exporter.cloudshelf.svc.cluster.local:9216']
+
+      # Kafka Exporter
+      - job_name: 'kafka'
+        static_configs:
+          - targets: ['kafka-exporter.cloudshelf.svc.cluster.local:9308']
+
+      # PostgreSQL Exporters
+      - job_name: 'postgres-exporter'
+        static_configs:
+          - targets:
+              - 'postgres-author-exporter.cloudshelf.svc.cluster.local:9187'
+              - 'postgres-order-exporter.cloudshelf.svc.cluster.local:9187'
+              - 'postgres-stock-exporter.cloudshelf.svc.cluster.local:9187'
+
+      # Kube State Metrics (Service Discovery)
+      - job_name: 'kube-state-metrics'
+        kubernetes_sd_configs:
+          - role: endpoints
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_service_name]
+            regex: kube-state-metrics
+            action: keep
+
+      # Node Exporter (runs on each node)
+      - job_name: 'node-exporter'
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - source_labels: [__address__]
+            regex: (.+):(.+)
+            target_label: __address__
+            replacement: ${1}:9100
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)

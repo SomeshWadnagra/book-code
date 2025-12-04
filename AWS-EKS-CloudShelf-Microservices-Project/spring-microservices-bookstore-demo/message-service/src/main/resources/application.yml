@@ -1,0 +1,53 @@
+spring:
+  application:
+    name: message-service
+
+  # Kafka configuration
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: message-service-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.use.type.headers: false
+        spring.json.value.default.type: com.chrisbaileydeveloper.messageservice.OrderPlacedEvent
+
+# Management and Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+
+  # Zipkin tracing
+  zipkin:
+    tracing:
+      endpoint: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://localhost:9411/api/v2/spans}
+
+  tracing:
+    sampling:
+      probability: 1.0
+
+  # Prometheus metrics
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.chrisbaileydeveloper: DEBUG
+    org.apache.kafka: INFO
+
+# AWS SNS Configuration
+aws:
+  region: ${AWS_REGION:us-east-1}
+  sns:
+    topic-arn: ${AWS_SNS_TOPIC_ARN:}

@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: cloudshelf
+data:
+  SERVER_PORT: "8080"
+  SPRING_APPLICATION_NAME: "api-gateway"
+  BOOK_SERVICE_URL: "http://book-service.cloudshelf.svc.cluster.local:8081"
+  AUTHOR_SERVICE_URL: "http://author-service.cloudshelf.svc.cluster.local:8085"
+  ORDER_SERVICE_URL: "http://order-service.cloudshelf.svc.cluster.local:8082"
+  REVIEWS_SERVICE_URL: "http://reviews-service.cloudshelf.svc.cluster.local:8086"
+  CART_SERVICE_URL: "http://cart-service.cloudshelf.svc.cluster.local:8087"
+  CORS_ALLOWED_ORIGINS: "*"
+  MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: "http://zipkin.cloudshelf.svc.cluster.local:9411/api/v2/spans"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"
+  SPRING_CLOUD_GATEWAY_ROUTES_0_ID: "book-service"
+  SPRING_CLOUD_GATEWAY_ROUTES_0_URI: "http://book-service.cloudshelf.svc.cluster.local:8081"
+  SPRING_CLOUD_GATEWAY_ROUTES_0_PREDICATES_0: "Path=/api/graphql"
+  SPRING_CLOUD_GATEWAY_ROUTES_0_FILTERS_0: "StripPrefix=1"
+  SPRING_CLOUD_GATEWAY_ROUTES_1_ID: "author-service"
+  SPRING_CLOUD_GATEWAY_ROUTES_1_URI: "http://author-service.cloudshelf.svc.cluster.local:8085"
+  SPRING_CLOUD_GATEWAY_ROUTES_1_PREDICATES_0: "Path=/api/authors/**"
+  SPRING_CLOUD_GATEWAY_ROUTES_2_ID: "order-service"
+  SPRING_CLOUD_GATEWAY_ROUTES_2_URI: "http://order-service.cloudshelf.svc.cluster.local:8082"
+  SPRING_CLOUD_GATEWAY_ROUTES_2_PREDICATES_0: "Path=/api/order/**"
+  SPRING_CLOUD_GATEWAY_ROUTES_3_ID: "reviews-service"
+  SPRING_CLOUD_GATEWAY_ROUTES_3_URI: "http://reviews-service.cloudshelf.svc.cluster.local:8086"
+  SPRING_CLOUD_GATEWAY_ROUTES_3_PREDICATES_0: "Path=/api/reviews/**"
+  SPRING_CLOUD_GATEWAY_ROUTES_3_FILTERS_0: "StripPrefix=1"
+  SPRING_CLOUD_GATEWAY_ROUTES_4_ID: "cart-service"
+  SPRING_CLOUD_GATEWAY_ROUTES_4_URI: "http://cart-service.cloudshelf.svc.cluster.local:8087"
+  SPRING_CLOUD_GATEWAY_ROUTES_4_PREDICATES_0: "Path=/api/cart/**"

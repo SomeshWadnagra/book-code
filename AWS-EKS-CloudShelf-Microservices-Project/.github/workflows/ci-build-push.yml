@@ -1,0 +1,126 @@
+name: CI - Build and Push to ECR
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - feature/**
+    paths:
+      - 'spring-microservices-bookstore-demo/**'
+      - '.github/workflows/ci-build-push.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.us-east-1.amazonaws.com
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      matrix:
+        service:
+          - api-gateway
+          - book-service
+          - author-service
+          - order-service
+          - stock-check-service
+          - message-service
+          - reviews-service
+          - cart-service
+          - frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Ensure ECR repository exists (auto-create)
+        run: |
+          REPO_NAME="cloudshelf/${{ matrix.service }}"
+          echo "Checking if repository ${REPO_NAME} exists..."
+          if aws ecr describe-repositories --repository-names "${REPO_NAME}" 2>/dev/null; then
+            echo "✅ Repository ${REPO_NAME} already exists"
+          else
+            echo "📦 Repository ${REPO_NAME} does not exist, creating..."
+            aws ecr create-repository \
+              --repository-name "${REPO_NAME}" \
+              --region ${{ env.AWS_REGION }} \
+              --image-scanning-configuration scanOnPush=true \
+              --image-tag-mutability MUTABLE
+            echo "✅ Repository ${REPO_NAME} created successfully"
+          fi
+
+      - name: Set up JDK 17 (for Java services)
+        if: matrix.service != 'frontend'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Set up Node.js (for frontend)
+        if: matrix.service == 'frontend'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: spring-microservices-bookstore-demo/frontend/package-lock.json
+
+      - name: Build with Maven (Java services)
+        if: matrix.service != 'frontend'
+        run: |
+          cd spring-microservices-bookstore-demo
+          mvn clean package -pl ${{ matrix.service }} -am -DskipTests
+
+      - name: Build Docker image
+        run: |
+          cd spring-microservices-bookstore-demo/${{ matrix.service }}
+          docker build -t ${{ env.ECR_REGISTRY }}/cloudshelf/${{ matrix.service }}:${{ github.sha }} .
+          docker tag ${{ env.ECR_REGISTRY }}/cloudshelf/${{ matrix.service }}:${{ github.sha }} \
+                     ${{ env.ECR_REGISTRY }}/cloudshelf/${{ matrix.service }}:latest
+
+      - name: Push Docker image to ECR
+        run: |
+          docker push ${{ env.ECR_REGISTRY }}/cloudshelf/${{ matrix.service }}:${{ github.sha }}
+          docker push ${{ env.ECR_REGISTRY }}/cloudshelf/${{ matrix.service }}:latest
+
+      - name: Image digest
+        run: |
+          echo "Image pushed:"
+          echo "${{ env.ECR_REGISTRY }}/cloudshelf/${{ matrix.service }}:${{ github.sha }}"
+          echo "${{ env.ECR_REGISTRY }}/cloudshelf/${{ matrix.service }}:latest"
+
+  notify:
+    name: Notify Build Status
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: always()
+    steps:
+      - name: Send Success Notification
+        if: needs.build-and-push.result == 'success'
+        run: |
+          echo "✅ All images built and pushed successfully!"
+
+      - name: Send Failure Notification
+        if: needs.build-and-push.result == 'failure'
+        run: |
+          echo "❌ Build failed!"

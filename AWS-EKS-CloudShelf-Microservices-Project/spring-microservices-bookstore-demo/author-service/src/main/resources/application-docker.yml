@@ -1,0 +1,21 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: author-service
+  
+  r2dbc:
+    url: r2dbc:postgresql://postgres-author:5432/author_service
+    username: ${SPRING_R2DBC_USERNAME:admin}
+    password: ${SPRING_R2DBC_PASSWORD:password}
+  
+  flyway:
+    url: jdbc:postgresql://postgres-author:5432/author_service
+    user: ${SPRING_FLYWAY_USER:admin}
+    password: ${SPRING_FLYWAY_PASSWORD:password}
+
+management:
+  zipkin:
+    tracing:
+      endpoint: http://zipkin:9411/api/v2/spans

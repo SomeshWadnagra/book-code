@@ -1,0 +1,277 @@
+name: CD - Deploy to EKS
+
+on:
+  workflow_run:
+    workflows: ["CI - Build and Push to ECR"]
+    types: [completed]
+    branches:
+      - main
+      - develop
+      - feature/**
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'prod'
+        type: choice
+        options: [dev, prod]
+      branch:
+        description: 'Branch to deploy from'
+        required: false
+        default: 'main'
+        type: string
+
+env:
+  AWS_REGION: us-east-1
+  EKS_CLUSTER_NAME: cloudshelf-eks
+
+jobs:
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_branch || github.event.inputs.branch || 'main' }}
+
+      - name: Show deployment info
+        run: |
+          echo "==========================================="
+          echo "🚀 Starting CloudShelf Deployment"
+          echo "==========================================="
+          echo "📌 Branch: ${{ github.event.workflow_run.head_branch || github.event.inputs.branch || 'main' }}"
+          echo "📦 Triggered by: ${{ github.event_name }}"
+          echo "🔖 Commit SHA: ${{ github.event.workflow_run.head_sha || github.sha }}"
+          echo "==========================================="
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
+
+      - name: Verify cluster access
+        run: |
+          echo "🔍 Verifying cluster access..."
+          kubectl get nodes
+          kubectl cluster-info
+
+      - name: Deploy namespace
+        run: |
+          echo "📁 Deploying namespace..."
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/00-namespace/
+
+      - name: Update image registry in deployments
+        env:
+          IMAGE_TAG: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          echo "🔧 Updating image registry and tags..."
+          cd spring-microservices-bookstore-demo/kubernetes
+          # Update registry from DockerHub to ECR
+          find 04-services -name "deployment.yaml" -type f -exec sed -i 's|image: shpro123/|image: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/cloudshelf/|g' {} +
+          # Update image tag to use the specific commit SHA
+          find 04-services -name "deployment.yaml" -type f -exec sed -i "s|:latest|:${IMAGE_TAG}|g" {} +
+          echo "✅ Image references updated to use tag: ${IMAGE_TAG}"
+
+      - name: Deploy static secrets (MongoDB, Kafka, API-Gateway)
+        run: |
+          echo "🔐 Deploying secrets..."
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/02-secrets/
+
+      - name: Dynamic RDS Secret for reviews-service
+        run: |
+          echo "🔐 Setting up RDS credentials for reviews-service..."
+          RDS_ENDPOINT=$(aws rds describe-db-instances \
+            --db-instance-identifier cloudshelf-db \
+            --region ${{ env.AWS_REGION }} \
+            --query 'DBInstances[0].Endpoint.Address' \
+            --output text 2>/dev/null || echo "")
+
+          if [[ "$RDS_ENDPOINT" == "None" || -z "$RDS_ENDPOINT" ]]; then
+            echo "⚠️ RDS endpoint not found — skipping reviews-db-credentials"
+          else
+            echo "🔧 Creating reviews-db-credentials with host: $RDS_ENDPOINT"
+            kubectl delete secret reviews-db-credentials -n cloudshelf --ignore-not-found
+            kubectl create secret generic reviews-db-credentials \
+              --namespace cloudshelf \
+              --from-literal=SPRING_DATASOURCE_URL="jdbc:postgresql://${RDS_ENDPOINT}:5432/reviews_db" \
+              --from-literal=SPRING_DATASOURCE_USERNAME="reviews_user" \
+              --from-literal=SPRING_DATASOURCE_PASSWORD="ReviewsSecure123!" \
+              --dry-run=client -o yaml | kubectl apply -f -
+            echo "✅ reviews-db-credentials created"
+          fi
+
+      - name: Deploy ConfigMaps
+        run: |
+          echo "📝 Deploying ConfigMaps..."
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/01-configmaps/
+
+      - name: Deploy infrastructure (MongoDB, Kafka, Redis, Zipkin)
+        run: |
+          echo "🏗️ Deploying infrastructure components..."
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/03-infrastructure/
+          echo "✅ Infrastructure manifests applied"
+
+      - name: Wait for core infrastructure
+        run: |
+          echo "⏳ Waiting for core infrastructure to be ready..."
+          
+          echo "  → Waiting for MongoDB..."
+          kubectl wait --for=condition=ready pod -l app=mongodb -n cloudshelf --timeout=300s
+          
+          echo "  → Waiting for Kafka..."
+          kubectl wait --for=condition=ready pod -l app=kafka -n cloudshelf --timeout=300s
+          
+          echo "  → Waiting for Redis..."
+          kubectl wait --for=condition=ready pod -l app=redis -n cloudshelf --timeout=300s
+          
+          echo "  → Waiting for Zipkin..."
+          kubectl wait --for=condition=ready pod -l app=zipkin -n cloudshelf --timeout=300s || true
+          
+          echo "✅ Core infrastructure is ready"
+
+      - name: Deploy Prometheus and Grafana monitoring
+        run: |
+          echo "📊 Deploying monitoring stack..."
+          
+          # Prometheus RBAC and config
+          echo "  → Deploying Prometheus..."
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/prometheus-rbac.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/prometheus-config.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/prometheus-deployment.yaml
+          
+          # Exporters
+          echo "  → Deploying exporters..."
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/mongodb-exporter.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/kafka-exporter.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/postgres-exporter.yaml
+          
+          # Grafana config and dashboards
+          echo "  → Deploying Grafana..."
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/grafana-datasources.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/grafana-dashboards-config.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/grafana-dashboard-overview.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/grafana-dashboard-jvm.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/grafana-dashboard-mongodb.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/grafana-dashboard-kafka.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/grafana-dashboard-postgres.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/grafana-deployment.yaml
+          
+          # Kubernetes metrics
+          echo "  → Deploying kube-state-metrics and node-exporter..."
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/kube-state-metrics.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/node-exporter.yaml
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/06-monitoring/grafana-dashboard-k8s.yaml
+          
+          echo "⏳ Waiting for monitoring stack..."
+          kubectl wait --for=condition=available --timeout=300s deployment/prometheus -n cloudshelf || true
+          kubectl wait --for=condition=available --timeout=300s deployment/grafana -n cloudshelf || true
+          echo "✅ Monitoring stack deployed"
+
+      - name: Deploy all microservices
+        run: |
+          echo "🚀 Deploying microservices..."
+          
+          SERVICES="api-gateway book-service author-service order-service stock-check-service message-service reviews-service cart-service frontend"
+          
+          for service in $SERVICES; do
+            echo "  → Deploying $service..."
+            kubectl apply -f spring-microservices-bookstore-demo/kubernetes/04-services/$service/deployment.yaml
+          done
+
+          echo "⏳ Waiting for all services to be ready..."
+          kubectl wait --for=condition=available --timeout=600s \
+            deployment/api-gateway \
+            deployment/book-service \
+            deployment/author-service \
+            deployment/order-service \
+            deployment/stock-check-service \
+            deployment/message-service \
+            deployment/reviews-service \
+            deployment/cart-service \
+            deployment/frontend -n cloudshelf
+          
+          echo "✅ All microservices deployed"
+
+      - name: Deploy Ingress
+        run: |
+          echo "🌐 Deploying Ingress..."
+          kubectl apply -f spring-microservices-bookstore-demo/kubernetes/05-ingress/ingress.yaml
+
+      - name: Update Frontend + Gateway ConfigMaps with ALB Hostname
+        run: |
+          echo "⏳ Waiting for ALB to be provisioned..."
+          HOST=""
+          for i in {1..40}; do
+            echo "  Attempt $i/40..."
+            HOST=$(kubectl get ingress cloudshelf-ingress -n cloudshelf -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+            if [[ -n "$HOST" ]]; then
+              echo "✅ ALB hostname: $HOST"
+              break
+            fi
+            sleep 15
+          done
+          
+          if [[ -z "$HOST" ]]; then
+            echo "❌ ALB not ready after 10 minutes — deployment may be incomplete"
+            exit 1
+          fi
+          
+          echo "🔧 Updating ConfigMaps with ALB hostname..."
+          kubectl patch configmap frontend-config -n cloudshelf --type merge -p \
+            "{\"data\":{\"NEXT_PUBLIC_API_BASE_URL\":\"http://$HOST/api\"}}"
+
+          kubectl patch configmap frontend-config -n cloudshelf --type merge -p \
+            "{\"data\":{\"NEXT_PUBLIC_API_GATEWAY_URL\":\"http://$HOST/api/graphql\"}}"
+
+          kubectl patch configmap api-gateway-config -n cloudshelf --type merge -p \
+            "{\"data\":{\"CORS_ALLOWED_ORIGINS\":\"http://$HOST\"}}"
+          
+          echo "🔄 Restarting frontend and api-gateway to pick up new config..."
+          kubectl rollout restart deployment/frontend -n cloudshelf
+          kubectl rollout restart deployment/api-gateway -n cloudshelf
+          
+          echo "⏳ Waiting for rollout to complete..."
+          kubectl rollout status deployment/frontend -n cloudshelf --timeout=120s
+          kubectl rollout status deployment/api-gateway -n cloudshelf --timeout=120s
+          echo "✅ ConfigMaps updated and services restarted"
+
+      - name: Show Deployment Summary
+        run: |
+          echo ""
+          echo "==========================================="
+          echo "🎉 CloudShelf Deployment Complete!"
+          echo "==========================================="
+          echo ""
+          echo "📌 Branch: ${{ github.event.workflow_run.head_branch || github.event.inputs.branch || 'main' }}"
+          echo "📌 Commit: ${{ github.event.workflow_run.head_sha || github.sha }}"
+          echo ""
+          echo "📦 Pod Status:"
+          kubectl get pods -n cloudshelf -o wide
+          echo ""
+          echo "🌐 Ingress Status:"
+          kubectl get ingress -n cloudshelf
+          echo ""
+          HOST=$(kubectl get ingress cloudshelf-ingress -n cloudshelf -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+          echo "==========================================="
+          echo "🔗 Access URLs:"
+          echo "==========================================="
+          echo "🌐 Application:  http://$HOST"
+          echo "📊 Grafana:      http://$HOST/grafana"
+          echo "   └─ Login:     admin / CloudShelf2025!"
+          echo "📈 Prometheus:   http://$HOST/prometheus"
+          echo "🔍 Zipkin:       kubectl port-forward svc/zipkin 9411:9411 -n cloudshelf"
+          echo "==========================================="

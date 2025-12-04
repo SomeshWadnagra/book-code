@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: book-service-config
+  namespace: cloudshelf
+data:
+  SERVER_PORT: "8081"
+  SPRING_APPLICATION_NAME: "book-service"
+  SPRING_DATA_MONGODB_HOST: "mongodb.cloudshelf.svc.cluster.local"
+  SPRING_DATA_MONGODB_PORT: "27017"
+  SPRING_DATA_MONGODB_DATABASE: "book-service"
+  SPRING_DATA_MONGODB_AUTHENTICATION_DATABASE: "admin"
+  MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: "http://zipkin.cloudshelf.svc.cluster.local:9411/api/v2/spans"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"

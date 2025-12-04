@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-author
+  namespace: cloudshelf
+spec:
+  ports:
+  - port: 5432
+  clusterIP: None
+  selector:
+    app: postgres-author
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-author
+  namespace: cloudshelf
+spec:
+  serviceName: postgres-author
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres-author
+  template:
+    metadata:
+      labels:
+        app: postgres-author
+    spec:
+      containers:
+      - name: postgres
+        image: 443071119316.dkr.ecr.us-east-1.amazonaws.com/cloudshelf/postgres:16-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: "author_service"
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: database-secrets
+              key: POSTGRES_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        volumeMounts:
+        - name: postgres-data
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+  volumeClaimTemplates:
+  - metadata:
+      name: postgres-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      storageClassName: gp2
+      resources:
+        requests:
+          storage: 5Gi

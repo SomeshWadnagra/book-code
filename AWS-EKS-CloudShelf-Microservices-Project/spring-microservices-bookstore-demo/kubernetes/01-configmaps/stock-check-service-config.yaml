@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: stock-check-service-config
+  namespace: cloudshelf
+data:
+  SERVER_PORT: "8083"
+  SPRING_APPLICATION_NAME: "stock-check-service"
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://postgres-stock.cloudshelf.svc.cluster.local:5432/stock_check_service"
+  MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: "http://zipkin.cloudshelf.svc.cluster.local:9411/api/v2/spans"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"

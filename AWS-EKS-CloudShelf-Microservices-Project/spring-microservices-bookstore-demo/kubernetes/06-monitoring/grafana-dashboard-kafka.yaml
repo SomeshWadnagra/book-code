@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-kafka
+  namespace: cloudshelf
+data:
+  kafka.json: |
+    {
+      "uid": "cloudshelf-kafka",
+      "title": "CloudShelf Kafka",
+      "tags": ["cloudshelf", "kafka", "messaging"],
+      "timezone": "browser",
+      "refresh": "10s",
+      "time": {"from": "now-1h", "to": "now"},
+      "panels": [
+        {
+          "id": 1,
+          "title": "Kafka Broker Up",
+          "type": "stat",
+          "gridPos": {"h": 4, "w": 8, "x": 0, "y": 0},
+          "targets": [{"expr": "kafka_brokers", "legendFormat": "Brokers"}],
+          "fieldConfig": {"defaults": {"unit": "short", "thresholds": {"steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}}
+        },
+        {
+          "id": 2,
+          "title": "Topics Count",
+          "type": "stat",
+          "gridPos": {"h": 4, "w": 8, "x": 8, "y": 0},
+          "targets": [{"expr": "count(kafka_topic_partitions)", "legendFormat": "Topics"}],
+          "fieldConfig": {"defaults": {"unit": "short"}}
+        },
+        {
+          "id": 3,
+          "title": "Total Partitions",
+          "type": "stat",
+          "gridPos": {"h": 4, "w": 8, "x": 16, "y": 0},
+          "targets": [{"expr": "sum(kafka_topic_partitions)", "legendFormat": "Partitions"}],
+          "fieldConfig": {"defaults": {"unit": "short"}}
+        },
+        {
+          "id": 4,
+          "title": "Messages In/sec by Topic",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+          "targets": [{"expr": "sum(rate(kafka_topic_partition_current_offset[5m])) by (topic)", "legendFormat": "{{topic}}"}],
+          "fieldConfig": {"defaults": {"unit": "short"}}
+        },
+        {
+          "id": 5,
+          "title": "Consumer Group Lag",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+          "targets": [{"expr": "sum(kafka_consumergroup_lag) by (consumergroup, topic)", "legendFormat": "{{consumergroup}} - {{topic}}"}],
+          "fieldConfig": {"defaults": {"unit": "short"}}
+        },
+        {
+          "id": 6,
+          "title": "Partition Offset",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 24, "x": 0, "y": 12},
+          "targets": [{"expr": "kafka_topic_partition_current_offset{topic=\"messageTopic\"}", "legendFormat": "{{topic}} - partition {{partition}}"}],
+          "fieldConfig": {"defaults": {"unit": "short"}}
+        }
+      ],
+      "schemaVersion": 38
+    }

@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-mongodb
+  namespace: cloudshelf
+data:
+  mongodb.json: |
+    {
+      "uid": "cloudshelf-mongodb",
+      "title": "CloudShelf MongoDB",
+      "tags": ["cloudshelf", "mongodb", "database"],
+      "timezone": "browser",
+      "refresh": "10s",
+      "time": {"from": "now-1h", "to": "now"},
+      "panels": [
+        {
+          "id": 1,
+          "title": "MongoDB Up",
+          "type": "stat",
+          "gridPos": {"h": 4, "w": 6, "x": 0, "y": 0},
+          "targets": [{"expr": "mongodb_up", "legendFormat": "Status"}],
+          "fieldConfig": {"defaults": {"mappings": [{"type": "value", "options": {"0": {"text": "DOWN", "color": "red"}, "1": {"text": "UP", "color": "green"}}}]}}
+        },
+        {
+          "id": 2,
+          "title": "Current Connections",
+          "type": "stat",
+          "gridPos": {"h": 4, "w": 6, "x": 6, "y": 0},
+          "targets": [{"expr": "mongodb_ss_connections{conn_type=\"current\"}", "legendFormat": "Connections"}],
+          "fieldConfig": {"defaults": {"unit": "short"}}
+        },
+        {
+          "id": 3,
+          "title": "Available Connections",
+          "type": "stat",
+          "gridPos": {"h": 4, "w": 6, "x": 12, "y": 0},
+          "targets": [{"expr": "mongodb_ss_connections{conn_type=\"available\"}", "legendFormat": "Available"}],
+          "fieldConfig": {"defaults": {"unit": "short"}}
+        },
+        {
+          "id": 4,
+          "title": "Memory Usage",
+          "type": "stat",
+          "gridPos": {"h": 4, "w": 6, "x": 18, "y": 0},
+          "targets": [{"expr": "mongodb_ss_mem_resident", "legendFormat": "Resident MB"}],
+          "fieldConfig": {"defaults": {"unit": "decmbytes"}}
+        },
+        {
+          "id": 5,
+          "title": "Operations/sec",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 0, "y": 4},
+          "targets": [
+            {"expr": "rate(mongodb_ss_opcounters_total{type=\"query\"}[5m])", "legendFormat": "Query"},
+            {"expr": "rate(mongodb_ss_opcounters_total{type=\"insert\"}[5m])", "legendFormat": "Insert"},
+            {"expr": "rate(mongodb_ss_opcounters_total{type=\"update\"}[5m])", "legendFormat": "Update"},
+            {"expr": "rate(mongodb_ss_opcounters_total{type=\"delete\"}[5m])", "legendFormat": "Delete"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "ops"}}
+        },
+        {
+          "id": 6,
+          "title": "Network I/O",
+          "type": "timeseries",
+          "gridPos": {"h": 8, "w": 12, "x": 12, "y": 4},
+          "targets": [
+            {"expr": "rate(mongodb_ss_network_bytesIn[5m])", "legendFormat": "Bytes In"},
+            {"expr": "rate(mongodb_ss_network_bytesOut[5m])", "legendFormat": "Bytes Out"}
+          ],
+          "fieldConfig": {"defaults": {"unit": "Bps"}}
+        }
+      ],
+      "schemaVersion": 38
+    }

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: message-service-config
+  namespace: cloudshelf
+data:
+  SPRING_APPLICATION_NAME: "message-service"
+  SPRING_KAFKA_BOOTSTRAP_SERVERS: "kafka.cloudshelf.svc.cluster.local:9092"
+  MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: "http://zipkin.cloudshelf.svc.cluster.local:9411/api/v2/spans"
+  MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: "health,info,prometheus,metrics"
+  AWS_REGION: "us-east-1"
+  AWS_SNS_TOPIC_ARN: "arn:aws:sns:us-east-1:443071119316:cloudshelf-notifications"

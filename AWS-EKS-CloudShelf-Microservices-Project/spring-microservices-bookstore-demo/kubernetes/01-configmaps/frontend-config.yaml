@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: cloudshelf
+data:
+  NEXT_PUBLIC_API_BASE_URL: "http://k8s-cloudshe-cloudshe-796e07ef43-1342598769.us-east-1.elb.amazonaws.com/api"
+  NEXT_PUBLIC_API_GATEWAY_URL: "http://k8s-cloudshe-cloudshe-796e07ef43-1342598769.us-east-1.elb.amazonaws.com/api/graphql"
+  NEXT_PUBLIC_USE_DUMMY_DATA: "false"
+  NEXT_PUBLIC_AWS_REGION: "us-east-1"
+  NEXT_PUBLIC_COGNITO_USER_POOL_ID: "us-east-1_7bkpvhrSy"
+  NEXT_PUBLIC_COGNITO_CLIENT_ID: "2iegtmo6rrrugim1euqbmokjhk"
+  MINIKUBE_API_HOST: "http://api-gateway.cloudshelf.svc.cluster.local:8080"
+  NODE_ENV: "production"
+  NEXT_TELEMETRY_DISABLED: "1"

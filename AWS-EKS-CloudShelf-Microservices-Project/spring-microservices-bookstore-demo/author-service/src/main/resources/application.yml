@@ -1,0 +1,56 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: author-service
+  
+  # R2DBC (Reactive) PostgreSQL configuration
+  r2dbc:
+    url: ${SPRING_R2DBC_URL:r2dbc:postgresql://localhost:5433/author_service}
+    username: ${SPRING_R2DBC_USERNAME:admin}
+    password: ${SPRING_R2DBC_PASSWORD:password}
+    pool:
+      initial-size: 10
+      max-size: 20
+  
+  # Flyway for database migrations (uses JDBC, not R2DBC)
+  flyway:
+    url: ${SPRING_FLYWAY_URL:jdbc:postgresql://localhost:5433/author_service}
+    user: ${SPRING_FLYWAY_USER:admin}
+    password: ${SPRING_FLYWAY_PASSWORD:password}
+    enabled: true
+    baseline-on-migrate: true
+
+# Management and Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      show-details: always
+  
+  # Zipkin tracing
+  zipkin:
+    tracing:
+      endpoint: ${MANAGEMENT_ZIPKIN_TRACING_ENDPOINT:http://localhost:9411/api/v2/spans}
+  
+  tracing:
+    sampling:
+      probability: 1.0
+  
+  # Prometheus metrics
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# Logging
+logging:
+  level:
+    root: INFO
+    com.chrisbaileydeveloper: DEBUG
+    io.r2dbc: DEBUG
+    org.springframework.data.r2dbc: DEBUG
